@@ -11,8 +11,7 @@ app = FastAPI(
     description="MVP API az AI-alapú bevásárláshoz."
 )
 
-# DEMO: allow the local HTML demo to call the API.
-# Productionban ezt szűkíteni kell a saját frontend domainre.
+# CORS a helyi HTML demohoz és fejlesztéshez. Productionben szűkítsd az origin listát.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
