@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "name": "Ariel Color mosókapszula",
+    "unit": "60 db",
+    "price": 7490,
+    "stock": 25,
+    "category": "Mosás"
+  },
+  {
+    "id": 2,
+    "name": "Lenor öblítő",
+    "unit": "1,2 L",
+    "price": 2190,
+    "stock": 18,
+    "category": "Mosás"
+  },
+  {
+    "id": 3,
+    "name": "Finish All in 1 mosogatógép-tabletta",
+    "unit": "80 db",
+    "price": 5990,
+    "stock": 12,
+    "category": "Mosogatás"
+  },
+  {
+    "id": 4,
+    "name": "Jar Sensitive mosogatószer",
+    "unit": "900 ml",
+    "price": 1190,
+    "stock": 30,
+    "category": "Mosogatás"
+  },
+  {
+    "id": 5,
+    "name": "Zewa Deluxe WC-papír",
+    "unit": "16 tekercs",
+    "price": 2990,
+    "stock": 20,
+    "category": "Háztartás"
+  },
+  {
+    "id": 6,
+    "name": "Tchibo Family őrölt kávé",
+    "unit": "500 g",
+    "price": 2690,
+    "stock": 22,
+    "category": "Élelmiszer"
+  },
+  {
+    "id": 7,
+    "name": "Lavazza Crema e Gusto",
+    "unit": "250 g",
+    "price": 2290,
+    "stock": 15,
+    "category": "Élelmiszer"
+  },
+  {
+    "id": 8,
+    "name": "Purina ONE kutyatáp",
+    "unit": "2,5 kg",
+    "price": 6490,
+    "stock": 9,
+    "category": "Kisállat"
+  },
+  {
+    "id": 9,
+    "name": "Head & Shoulders sampon",
+    "unit": "400 ml",
+    "price": 2490,
+    "stock": 14,
+    "category": "Fürdőszoba"
+  },
+  {
+    "id": 10,
+    "name": "Nivea Men tusfürdő",
+    "unit": "500 ml",
+    "price": 1790,
+    "stock": 17,
+    "category": "Fürdőszoba"
+  }
+]
