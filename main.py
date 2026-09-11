@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from pathlib import Path
@@ -8,6 +9,16 @@ app = FastAPI(
     title="XY.com API",
     version="0.2.0",
     description="MVP API az AI-alapú bevásárláshoz."
+)
+
+# DEMO: allow the local HTML demo to call the API.
+# Productionban ezt szűkíteni kell a saját frontend domainre.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 PRODUCTS = json.loads(Path("products.json").read_text(encoding="utf-8"))
