@@ -38,3 +38,23 @@ A következő lépésben ezt köthetjük adatbázishoz, majd a fulfillment/API r
 A szerver a közvetlen `POST /api/orders` végpontot 410-es hibával letiltja, így a rendelés nem hozható létre kosár és confirm nélkül.
 
 A cart token felhasználóhoz kötött, ezért más felhasználó nem tudja használni.
+
+
+## 0.3.0 – MCP layer
+
+The same FastAPI service now exposes a Streamable HTTP MCP endpoint:
+
+`https://xymcp.onrender.com/mcp`
+
+MCP tools:
+- `search_products`
+- `create_cart`
+- `get_cart`
+- `add_to_cart`
+- `confirm_order`
+
+The current MCP layer uses the demo user/API key for testing only.
+Production must replace this with per-customer OAuth identity.
+
+The MCP Python SDK v2 is used. It supports Streamable HTTP and mounting
+the MCP ASGI app into an existing FastAPI application.

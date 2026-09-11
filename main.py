@@ -242,3 +242,173 @@ def create_order_legacy():
         status_code=410,
         detail="A közvetlen rendelés megszűnt. Előbb kosarat kell létrehozni, majd /api/carts/{cart_token}/confirm."
     )
+
+
+# ============================================================
+# MCP LAYER
+# ============================================================
+# Development/test implementation. Production must replace the
+# demo user/API key with OAuth-based user identity.
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+import os
+
+from starlette.routing import Mount
+from mcp.server import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
+
+MCP_DEMO_API_KEY = os.getenv("XY_MCP_API_KEY", "xy-demo-key-123")
+
+mcp = MCPServer(
+    "XY.com",
+    title="XY.com Shopping",
+    description="AI shopping tools for the XY.com test store.",
+    instructions=(
+        "Use search_products to find products. Create or use a cart before "
+        "adding items. Never call confirm_order until the user has explicitly "
+        "confirmed the final cart and total."
+    ),
+)
+
+@mcp.tool()
+def search_products(query: str) -> dict:
+    """Search XY products by name, category/type, or brand."""
+    result = PRODUCTS
+    terms = re.findall(r"\w+", query.lower().strip())
+    if terms:
+        result = [
+            p for p in result
+            if all(
+                t in (
+                    p["name"] + " " +
+                    p["category"] + " " +
+                    p.get("brand", "")
+                ).lower()
+                for t in terms
+            )
+        ]
+    return {"products": result, "count": len(result)}
+
+@mcp.tool()
+def get_cart(cart_token: str) -> dict:
+    """Get the current XY shopping cart and total."""
+    user = user_from_key(MCP_DEMO_API_KEY)
+    cart = get_cart_or_404(cart_token, user)
+    return get_cart_response(cart)
+
+@mcp.tool()
+def add_to_cart(cart_token: str, product_id: int, quantity: int) -> dict:
+    """Add a product to an existing XY cart."""
+    user = user_from_key(MCP_DEMO_API_KEY)
+    cart = get_cart_or_404(cart_token, user)
+
+    if cart["status"] != "open":
+        raise ValueError("A kosár már le van zárva.")
+
+    if quantity <= 0 or quantity > 99:
+        raise ValueError("A mennyiség 1 és 99 között legyen.")
+
+    p = product_by_id(product_id)
+    if not p:
+        raise ValueError("Termék nem található.")
+
+    existing = next(
+        (i for i in cart["items"] if i["product_id"] == product_id),
+        None
+    )
+    new_qty = quantity if existing is None else existing["quantity"] + quantity
+
+    if new_qty > p["stock"]:
+        raise ValueError(f"Nincs elég készlet: {p['name']}")
+
+    if existing:
+        existing["quantity"] = new_qty
+    else:
+        cart["items"].append({
+            "product_id": product_id,
+            "quantity": quantity
+        })
+
+    return get_cart_response(cart)
+
+@mcp.tool()
+def confirm_order(cart_token: str) -> dict:
+    """Confirm an XY cart and create the cash-on-delivery test order.
+
+    IMPORTANT: Call this only after the user has explicitly confirmed
+    the displayed cart contents and total.
+    """
+    user = user_from_key(MCP_DEMO_API_KEY)
+    cart = get_cart_or_404(cart_token, user)
+
+    if cart["status"] != "open":
+        raise ValueError("A kosár már le lett zárva.")
+    if not cart["items"]:
+        raise ValueError("A kosár üres.")
+
+    lines, total = build_cart(cart)
+
+    for item in cart["items"]:
+        p = product_by_id(item["product_id"])
+        p["stock"] -= item["quantity"]
+
+    new_order = {
+        "order_id": "XY-" + uuid.uuid4().hex[:8].upper(),
+        "user_id": user["id"],
+        "items": lines,
+        "total": total,
+        "payment_method": "cash_on_delivery",
+        "status": "teszt-rendeles"
+    }
+
+    ORDERS.append(new_order)
+    cart["status"] = "confirmed"
+    return new_order
+
+# Add a helper tool to start a new test cart. This is useful during
+# development; production will create the cart from the authenticated user.
+@mcp.tool()
+def create_cart() -> dict:
+    """Create a new XY shopping cart for the current test user."""
+    token = uuid.uuid4().hex
+    CARTS[token] = {
+        "cart_token": token,
+        "user_id": user_from_key(MCP_DEMO_API_KEY)["id"],
+        "items": [],
+        "status": "open"
+    }
+    return get_cart_response(CARTS[token])
+
+@asynccontextmanager
+async def mcp_lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # Mounted MCP apps do not run their own lifespan automatically.
+    # Keep the session manager alive from the host FastAPI application.
+    async with mcp.session_manager.run():
+        yield
+
+# Render serves this service at xymcp.onrender.com. The allowlist is
+# required by the current MCP SDK's DNS-rebinding protection for a
+# non-local deployment.
+mcp_transport_security = TransportSecuritySettings(
+    allowed_hosts=[
+        "xymcp.onrender.com",
+        "xymcp.onrender.com:*",
+    ],
+    allowed_origins=[
+        "https://chatgpt.com",
+        "https://chat.openai.com",
+    ],
+)
+
+mcp_asgi = mcp.streamable_http_app(
+    transport_security=mcp_transport_security,
+    stateless_http=True,
+)
+
+# The host FastAPI app must own the MCP lifespan when the MCP app is mounted.
+app.router.lifespan_context = mcp_lifespan
+app.router.routes.append(Mount("/mcp", app=mcp_asgi))
+# ============================================================
+# END MCP LAYER
+# ============================================================
+
