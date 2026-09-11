@@ -62,7 +62,10 @@ header{background:#fff;border-bottom:1px solid #e8e8e8;position:sticky;top:0;z-i
 <script>
 const API = "https://xymcp.onrender.com";
 const API_KEY = "xy-demo-key-123"; // Termékkereséshez és demo kosárhoz jelenleg nem kell kulcs.
-let cartToken = localStorage.getItem("xy_cart_token") || null;
+const params = new URLSearchParams(window.location.search);
+const sharedCartToken = params.get("cart");
+let cartToken = sharedCartToken || localStorage.getItem("xy_cart_token") || null;
+if (sharedCartToken) localStorage.setItem("xy_cart_token", sharedCartToken);
 let products = [];
 
 function money(n){return new Intl.NumberFormat("hu-HU").format(n)+" Ft"}
