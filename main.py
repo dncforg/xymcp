@@ -168,16 +168,37 @@ def get_cart_or_404(cart_token, user):
         raise HTTPException(404, "Kosár nem található")
     return cart
 
+def get_or_create_current_cart(user):
+    # A GPT régi cart_tokenje egy Render újraindítás után elavulhat.
+    # Ilyenkor a felhasználó aktuális kosarát használjuk, vagy létrehozunk egy újat.
+    cart = get_current_cart_for_user(user)
+    if cart:
+        return cart
+    token = uuid.uuid4().hex
+    CARTS[token] = {
+        "cart_token": token,
+        "user_id": user["id"],
+        "items": [],
+        "status": "open"
+    }
+    return CARTS[token]
+
 @app.get("/api/carts/{cart_token}")
 def get_cart(cart_token: str, x_api_key: str = Header(default="")):
     user = user_from_key(x_api_key)
-    cart = get_cart_or_404(cart_token, user)
+    cart = CARTS.get(cart_token)
+    if not cart or cart["user_id"] != user["id"]:
+        # Elavult token esetén az aktuális felhasználói kosarat adjuk vissza.
+        cart = get_or_create_current_cart(user)
     return get_cart_response(cart)
 
 @app.post("/api/carts/{cart_token}/items")
 def add_to_cart(cart_token: str, item: CartAdd, x_api_key: str = Header(default="")):
     user = user_from_key(x_api_key)
-    cart = get_cart_or_404(cart_token, user)
+    cart = CARTS.get(cart_token)
+    if not cart or cart["user_id"] != user["id"]:
+        # A GPT-ben tárolt régi token helyett mindig a felhasználó aktuális kosarát használjuk.
+        cart = get_or_create_current_cart(user)
     if cart["status"] != "open":
         raise HTTPException(409, "A kosár már le van zárva")
 
@@ -247,7 +268,11 @@ def remove_from_cart(
 @app.post("/api/carts/{cart_token}/confirm")
 def confirm_order(cart_token: str, x_api_key: str = Header(default="")):
     user = user_from_key(x_api_key)
-    cart = get_cart_or_404(cart_token, user)
+    cart = CARTS.get(cart_token)
+    if not cart or cart["user_id"] != user["id"]:
+        cart = get_current_cart_for_user(user)
+        if not cart:
+            raise HTTPException(404, "Nincs nyitott kosár")
 
     if cart["status"] != "open":
         raise HTTPException(409, "A kosár már le lett zárva")
