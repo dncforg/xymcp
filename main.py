@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -20,10 +19,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.get("/", include_in_schema=False)
-def home():
-    return FileResponse("index.html")
 
 PRODUCTS = json.loads(Path("products.json").read_text(encoding="utf-8"))
 ORDERS = []
@@ -113,9 +108,36 @@ def orders(x_api_key: str = Header(default="")):
     user = user_from_key(x_api_key)
     return {"orders": [o for o in ORDERS if o["user_id"] == user["id"]]}
 
+def get_current_cart_for_user(user):
+    # Demo/MVP: one active cart per user. Productionben ezt adatbázisban
+    # kell tárolni és valódi bejelentkezett felhasználóhoz kötni.
+    for cart in CARTS.values():
+        if cart["user_id"] == user["id"] and cart["status"] == "open":
+            return cart
+    return None
+
+@app.get("/api/carts/current")
+def get_current_cart(x_api_key: str = Header(default="")):
+    user = user_from_key(x_api_key)
+    cart = get_current_cart_for_user(user)
+    if not cart:
+        return {
+            "cart_token": None,
+            "status": "empty",
+            "items": [],
+            "total": 0,
+            "currency": "HUF"
+        }
+    return get_cart_response(cart)
+
 @app.post("/api/carts")
 def create_cart(x_api_key: str = Header(default="")):
     user = user_from_key(x_api_key)
+    # Ha már van nyitott kosár, azt használjuk új helyett.
+    existing = get_current_cart_for_user(user)
+    if existing:
+        return get_cart_response(existing)
+
     token = uuid.uuid4().hex
     CARTS[token] = {
         "cart_token": token,

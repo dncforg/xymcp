@@ -63,9 +63,8 @@ header{background:#fff;border-bottom:1px solid #e8e8e8;position:sticky;top:0;z-i
 const API = "https://xymcp.onrender.com";
 const API_KEY = "xy-demo-key-123"; // Termékkereséshez és demo kosárhoz jelenleg nem kell kulcs.
 const params = new URLSearchParams(window.location.search);
-const sharedCartToken = params.get("cart");
-let cartToken = sharedCartToken || localStorage.getItem("xy_cart_token") || null;
-if (sharedCartToken) localStorage.setItem("xy_cart_token", sharedCartToken);
+const sharedCartToken = params.get("cart"); // régi tesztlinkek továbbra is működnek
+let cartToken = sharedCartToken || null;
 let products = [];
 
 function money(n){return new Intl.NumberFormat("hu-HU").format(n)+" Ft"}
@@ -99,9 +98,13 @@ function renderProducts(){
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
 async function ensureCart(){
   if(cartToken)return cartToken;
+  const current=await req("/api/carts/current");
+  if(current.cart_token){
+    cartToken=current.cart_token;
+    return cartToken;
+  }
   const data=await req("/api/carts",{method:"POST"});
   cartToken=data.cart_token;
-  localStorage.setItem("xy_cart_token",cartToken);
   return cartToken;
 }
 async function add(id){
@@ -114,10 +117,16 @@ async function add(id){
   }catch(e){notice("Nem sikerült a kosárba tenni: "+e.message)}
 }
 async function loadCart(){
-  if(!cartToken){renderCart({items:[],total:0});return}
-  try{renderCart(await req(`/api/carts/${cartToken}`))}
-  catch(e){
-    localStorage.removeItem("xy_cart_token");cartToken=null;
+  try{
+    if(!cartToken){
+      const current=await req("/api/carts/current");
+      if(current.cart_token) cartToken=current.cart_token;
+      renderCart(current);
+      return;
+    }
+    renderCart(await req(`/api/carts/${cartToken}`));
+  }catch(e){
+    cartToken=null;
     renderCart({items:[],total:0});
   }
 }
@@ -154,7 +163,7 @@ async function confirmOrder(){
     const order=await req(`/api/carts/${cartToken}/confirm`,{method:"POST"});
     document.getElementById("cartNotice").textContent="Rendelés létrehozva: "+order.order_id+" · "+money(order.total);
     document.getElementById("cartNotice").classList.add("show");
-    localStorage.removeItem("xy_cart_token");cartToken=null;
+    cartToken=null;
     renderCart({items:[],total:0});
   }catch(e){notice(e.message,"cartNotice")}
 }
